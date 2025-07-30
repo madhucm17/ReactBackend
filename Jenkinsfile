@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Clone Backend Code') {
             steps {
-                git 'https://github.com/madhucm17/ReactBackend.git'
+                git branch: 'main', url 'https://github.com/madhucm17/ReactBackend.git'
             }
         }
 
