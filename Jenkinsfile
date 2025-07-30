@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Clone Backend Code') {
             steps {
-                git 'https://github.com/your-username/node-backend-repo.git'
+                git 'https://github.com/madhucm17/ReactBackend.git'
             }
         }
 
@@ -22,7 +22,7 @@ pipeline {
         stage('Start with PM2') {
             steps {
                 sh 'pm2 delete my-backend || true'
-                sh 'pm2 start index.js --name my-backend'
+                sh 'pm2 start index.js --name ReactBackend'
             }
         }
     }
