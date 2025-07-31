@@ -1,32 +1,47 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config({ path: './config.env' });
 
-// Database configuration
-const dbConfig = {
+// Database configuration without database name for initial connection
+const initialConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
   port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true
+  queueLimit: 0
+};
+
+// Database configuration with database name
+const dbConfig = {
+  ...initialConfig,
+  database: process.env.DB_NAME
 };
 
 // Create connection pool
 const pool = mysql.createPool(dbConfig);
 
-// Test database connection
+// Test database connection and create database if needed
 async function testConnection() {
   try {
-    const connection = await pool.getConnection();
-    console.log('✅ Database connected successfully!');
+    // First, connect without specifying database
+    const initialPool = mysql.createPool(initialConfig);
+    const connection = await initialPool.getConnection();
+    
+    // Create database if it doesn't exist
+    await connection.execute(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME}`);
+    console.log(`✅ Database '${process.env.DB_NAME}' created/verified successfully!`);
+    
     connection.release();
+    await initialPool.end();
+    
+    // Now test connection with database
+    const dbConnection = await pool.getConnection();
+    console.log('✅ Database connected successfully!');
+    dbConnection.release();
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
+    console.log('💡 Make sure MySQL is running and config.env has correct credentials');
     process.exit(1);
   }
 }

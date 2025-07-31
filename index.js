@@ -29,7 +29,65 @@ async function startServer() {
   }
 }
 
-// User login endpoint with database
+// User signup endpoint
+app.post('/api/signup', async (req, res) => {
+  try {
+    const { username, password, email } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username and password required' 
+      });
+    }
+
+    const connection = await pool.getConnection();
+    
+    // Check if user already exists
+    const [existingUsers] = await connection.execute(
+      'SELECT * FROM users WHERE username = ?',
+      [username]
+    );
+
+    if (existingUsers.length > 0) {
+      connection.release();
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username already exists. Please choose a different username.' 
+      });
+    }
+
+    // Create new user
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await connection.execute(
+      'INSERT INTO users (username, password, email) VALUES (?, ?, ?)',
+      [username, hashedPassword, email || '']
+    );
+    
+    const token = jwt.sign(
+      { username, id: result.insertId },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+
+    connection.release();
+    res.status(201).json({ 
+      success: true, 
+      message: 'User registered successfully! You can now sign in.',
+      user: { username, id: result.insertId },
+      token
+    });
+
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error' 
+    });
+  }
+});
+
+// User login endpoint (only for existing users)
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -50,29 +108,14 @@ app.post('/api/login', async (req, res) => {
     );
 
     if (users.length === 0) {
-      // Create new user (for demo purposes)
-      const hashedPassword = await bcrypt.hash(password, 10);
-      await connection.execute(
-        'INSERT INTO users (username, password) VALUES (?, ?)',
-        [username, hashedPassword]
-      );
-      
-      const token = jwt.sign(
-        { username, id: users.insertId },
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
       connection.release();
-      return res.json({ 
-        success: true, 
-        message: 'User created and logged in successfully',
-        user: { username },
-        token
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not found. Please sign up first!' 
       });
     }
 
-    // Verify existing user password
+    // Verify password
     const user = users[0];
     const isValidPassword = await bcrypt.compare(password, user.password);
     
@@ -80,20 +123,20 @@ app.post('/api/login', async (req, res) => {
       connection.release();
       return res.status(401).json({ 
         success: false, 
-        message: 'Invalid credentials' 
+        message: 'Invalid password. Please try again.' 
       });
     }
 
     const token = jwt.sign(
       { username: user.username, id: user.id },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '24h' }
     );
 
     connection.release();
     res.json({ 
       success: true, 
-      message: 'Login successful',
+      message: 'Login successful!',
       user: { username: user.username, id: user.id },
       token
     });

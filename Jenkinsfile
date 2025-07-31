@@ -1,4 +1,3 @@
-// Jenkinsfile for Node.js Backend
 pipeline {
     agent any
 
